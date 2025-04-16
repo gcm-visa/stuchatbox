@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Staff Chat Panel</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f4f4f4;
+    }
+    header {
+      background: #343a40;
+      color: white;
+      padding: 10px 20px;
+      font-size: 18px;
+    }
+    #chat-container {
+      display: flex;
+      flex-direction: column;
+      max-width: 600px;
+      margin: 20px auto;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      height: 80vh;
+    }
+    #chat-messages {
+      flex: 1;
+      padding: 15px;
+      overflow-y: auto;
+      border-bottom: 1px solid #ddd;
+    }
+    #chat-messages div {
+      margin-bottom: 10px;
+    }
+    #chat-form {
+      display: flex;
+    }
+    #chat-input {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-top: 1px solid #ddd;
+      font-size: 14px;
+      outline: none;
+    }
+    #chat-form button {
+      padding: 0 20px;
+      border: none;
+      background: #007bff;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<header>🧑‍💼 Staff Chat Panel</header>
+
+<div id="chat-container">
+  <div id="chat-messages"></div>
+  <form id="chat-form">
+    <input type="text" id="chat-input" placeholder="Reply as staff..." />
+    <button type="submit">Send</button>
+  </form>
+</div>
+
+<script>
+  const SUPABASE_URL = "https://oxthfocwsqttrzbdjzoj.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."; // Replace with full anon key
+
+  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const chatMessages = document.getElementById("chat-messages");
+  const chatForm = document.getElementById("chat-form");
+  const chatInput = document.getElementById("chat-input");
+
+  const staffName = prompt("Enter your staff name:") || "Staff";
+
+  function renderMessage(msg) {
+    const div = document.createElement("div");
+    const sender = msg.sender_type === "staff" ? `👩‍💼 ${msg.staff_name}` : msg.user_name;
+    div.textContent = `${sender}: ${msg.message}`;
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  async function loadMessages() {
+    const { data } = await supabase
+      .from("chat_messages")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    chatMessages.innerHTML = "";
+    data.forEach(renderMessage);
+  }
+
+  supabase
+    .channel("chatroom")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, (payload) => {
+      renderMessage(payload.new);
+    })
+    .subscribe();
+
+  chatForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const message = chatInput.value.trim();
+    if (!message) return;
+
+    await supabase.from("chat_messages").insert([{
+      user_name: null,
+      staff_name: staffName,
+      sender_type: "staff",
+      message: message
+    }]);
+
+    chatInput.value = "";
+  });
+
+  loadMessages();
+</script>
+
+</body>
+</html>
