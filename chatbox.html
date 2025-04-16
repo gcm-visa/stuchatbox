@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Live Chat</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <style>
+    body { font-family: sans-serif; }
+    #chat-button {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      font-size: 30px;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+    #chat-box {
+      display: none;
+      position: fixed;
+      bottom: 90px;
+      right: 20px;
+      width: 300px;
+      height: 400px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 1000;
+      border: 1px solid #ddd;
+    }
+    #chat-header {
+      background: #007bff;
+      color: white;
+      padding: 10px;
+      text-align: center;
+      font-weight: bold;
+    }
+    #chat-messages {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+      background: #f9f9f9;
+    }
+    #chat-form {
+      display: flex;
+      border-top: 1px solid #ddd;
+    }
+    #chat-form input {
+      flex: 1;
+      border: none;
+      padding: 10px;
+      font-size: 14px;
+    }
+    #chat-form button {
+      border: none;
+      background: #007bff;
+      color: white;
+      padding: 0 15px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<button id="chat-button">💬</button>
+
+<div id="chat-box">
+  <div id="chat-header">Live Chat</div>
+  <div id="chat-messages"></div>
+  <form id="chat-form">
+    <input type="text" id="chat-input" placeholder="Type a message..." />
+    <button type="submit">Send</button>
+  </form>
+</div>
+
+<script>
+  // 🔑 REPLACE with your Supabase project details
+  const SUPABASE_URL = "https://YOUR_PROJECT.supabase.co";
+  const SUPABASE_ANON_KEY = "YOUR_PUBLIC_ANON_KEY";
+
+  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Show/hide chat box
+  const button = document.getElementById("chat-button");
+  const box = document.getElementById("chat-box");
+  button.addEventListener("click", () => {
+    box.style.display = box.style.display === "none" ? "flex" : "none";
+  });
+
+  const chatMessages = document.getElementById("chat-messages");
+  const chatForm = document.getElementById("chat-form");
+  const chatInput = document.getElementById("chat-input");
+
+  // 🧍 Ask user's name once (can be improved)
+  let userName = prompt("Enter your name (optional):") || "Anonymous";
+
+  async function loadMessages() {
+    const { data } = await supabase
+      .from("chat_messages")
+      .select("*")
+      .order("created_at", { ascending: true });
+    chatMessages.innerHTML = "";
+    data.forEach(addMessageToUI);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function addMessageToUI(msg) {
+    const div = document.createElement("div");
+    div.textContent = `${msg.sender_type === 'staff' ? '👩‍💼 Staff' : msg.user_name}: ${msg.message}`;
+    chatMessages.appendChild(div);
+  }
+
+  // 📥 Subscribe to realtime updates
+  supabase
+    .channel("chatroom")
+    .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages" }, (payload) => {
+      addMessageToUI(payload.new);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    })
+    .subscribe();
+
+  // 📨 Send message
+  chatForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const message = chatInput.value.trim();
+    if (!message) return;
+
+    await supabase.from("chat_messages").insert([
+      {
+        user_name: userName,
+        staff_name: null,
+        sender_type: "user",
+        message: message,
+      }
+    ]);
+
+    chatInput.value = "";
+  });
+
+  loadMessages();
+</script>
+
+</body>
+</html>
