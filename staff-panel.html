@@ -2,91 +2,97 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Staff Chat Panel</title>
+  <title>Staff Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
-      font-family: sans-serif;
-      margin: 0;
-      padding: 0;
-      background: #f4f4f4;
-    }
-    header {
-      background: #343a40;
-      color: white;
-      padding: 10px 20px;
-      font-size: 18px;
-    }
-    #chat-container {
-      display: flex;
-      flex-direction: column;
+    body { font-family: 'Segoe UI', sans-serif; background: #f0fdf0; margin: 0; padding: 20px; }
+
+    #login-section, #chat-section {
       max-width: 600px;
-      margin: 20px auto;
+      margin: auto;
       background: white;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      height: 80vh;
+      border: 1px solid #cce5cc;
+      padding: 20px;
+      border-radius: 12px;
     }
+
+    h2 { color: #28a745; text-align: center; }
+
+    input[type="email"], input[type="password"], input[type="text"] {
+      width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 8px;
+      border: 1px solid #bde5bd;
+    }
+
+    button {
+      width: 100%; padding: 12px; background-color: #28a745; color: white;
+      border: none; border-radius: 8px; font-size: 16px; cursor: pointer;
+    }
+
     #chat-messages {
-      flex: 1;
-      padding: 15px;
-      overflow-y: auto;
-      border-bottom: 1px solid #ddd;
+      max-height: 300px; overflow-y: auto; border: 1px solid #e0f0e0;
+      padding: 10px; background: #f6fdf6; margin-bottom: 12px;
     }
-    #chat-messages div {
-      margin-bottom: 10px;
-    }
+
+    #chat-messages div { margin-bottom: 6px; }
+
     #chat-form {
       display: flex;
+      gap: 10px;
     }
-    #chat-input {
-      flex: 1;
-      padding: 10px;
-      border: none;
-      border-top: 1px solid #ddd;
-      font-size: 14px;
-      outline: none;
-    }
-    #chat-form button {
-      padding: 0 20px;
-      border: none;
-      background: #007bff;
-      color: white;
-      font-size: 14px;
-      cursor: pointer;
+
+    #chat-form input {
+      flex: 1; padding: 10px; border-radius: 8px;
+      border: 1px solid #bde5bd;
     }
   </style>
 </head>
 <body>
 
-<header>🧑‍💼 Staff Chat Panel</header>
+<div id="login-section">
+  <h2>Staff Login</h2>
+  <input type="email" id="staff-email" placeholder="Email" />
+  <input type="password" id="staff-password" placeholder="Password" />
+  <button onclick="login()">Login</button>
+  <p id="login-error" style="color: red;"></p>
+</div>
 
-<div id="chat-container">
+<div id="chat-section" style="display:none;">
+  <h2>Chat Dashboard</h2>
   <div id="chat-messages"></div>
   <form id="chat-form">
-    <input type="text" id="chat-input" placeholder="Reply as staff..." />
+    <input type="text" id="staff-input" placeholder="Reply..." />
     <button type="submit">Send</button>
   </form>
 </div>
 
 <script>
-  const SUPABASE_URL = "https://oxthfocwsqttrzbdjzoj.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94dGhmb2N3c3F0dHJ6YmRqem9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3OTY5MjMsImV4cCI6MjA2MDM3MjkyM30.nytOvmjM5PNQO8BHeXOTIP_sMullS2PFB8tm5dihlNY"; // Replace with full anon key
-
+  const SUPABASE_URL = 'https://oxthfocwsqttrzbdjzoj.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94dGhmb2N3c3F0dHJ6YmRqem9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3OTY5MjMsImV4cCI6MjA2MDM3MjkyM30.nytOvmjM5PNQO8BHeXOTIP_sMullS2PFB8tm5dihlNY';
   const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  const chatMessages = document.getElementById("chat-messages");
-  const chatForm = document.getElementById("chat-form");
-  const chatInput = document.getElementById("chat-input");
+  let staffName = "";
 
-  const staffName = prompt("Enter your staff name:") || "Staff";
+  async function login() {
+    const email = document.getElementById("staff-email").value;
+    const password = document.getElementById("staff-password").value;
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-  function renderMessage(msg) {
+    if (error) {
+      document.getElementById("login-error").textContent = error.message;
+    } else {
+      document.getElementById("login-section").style.display = "none";
+      document.getElementById("chat-section").style.display = "block";
+      staffName = email;
+      loadMessages();
+      subscribeToMessages();
+    }
+  }
+
+  function addMessageToUI(msg) {
     const div = document.createElement("div");
-    const sender = msg.sender_type === "staff" ? `👩‍💼 ${msg.staff_name}` : msg.user_name;
-    div.textContent = `${sender}: ${msg.message}`;
-    chatMessages.appendChild(div);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    div.textContent = `${msg.sender_type === 'staff' ? '👩‍💼 Staff' : msg.user_name}: ${msg.message}`;
+    document.getElementById("chat-messages").appendChild(div);
   }
 
   async function loadMessages() {
@@ -94,34 +100,31 @@
       .from("chat_messages")
       .select("*")
       .order("created_at", { ascending: true });
-
-    chatMessages.innerHTML = "";
-    data.forEach(renderMessage);
+    document.getElementById("chat-messages").innerHTML = "";
+    data.forEach(addMessageToUI);
   }
 
-  supabase
-    .channel("chatroom")
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, (payload) => {
-      renderMessage(payload.new);
-    })
-    .subscribe();
+  function subscribeToMessages() {
+    supabase
+      .channel("chatroom")
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages" }, (payload) => {
+        addMessageToUI(payload.new);
+      })
+      .subscribe();
+  }
 
-  chatForm.addEventListener("submit", async (e) => {
+  document.getElementById("chat-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const message = chatInput.value.trim();
+    const input = document.getElementById("staff-input");
+    const message = input.value.trim();
     if (!message) return;
 
-    await supabase.from("chat_messages").insert([{
-      user_name: null,
-      staff_name: staffName,
-      sender_type: "staff",
-      message: message
-    }]);
+    await supabase.from("chat_messages").insert([
+      { user_name: null, staff_name: staffName, sender_type: "staff", message: message }
+    ]);
 
-    chatInput.value = "";
+    input.value = "";
   });
-
-  loadMessages();
 </script>
 
 </body>
