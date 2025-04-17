@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #ffffff;
+      color: #333;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .box, .chat-box {
+      background: #f9f9f9;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      width: 90%;
+      max-width: 450px;
+    }
+
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+
+    button {
+      background-color: #28a745;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #218838;
+    }
+
+    .chat-area {
+      height: 300px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      background: #e9ecef;
+    }
+
+    .message {
+      margin-bottom: 8px;
+    }
+
+    .message.you {
+      text-align: right;
+      color: #007bff;
+    }
+
+    .message.staff {
+      text-align: left;
+      color: #28a745;
+    }
+
+    @media (max-width: 480px) {
+      .box, .chat-box {
+        padding: 20px;
+      }
+
+      .chat-area {
+        height: 250px;
+      }
+
+      input, button {
+        font-size: 14px;
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div id="joinForm" class="box">
+  <h2>Student Chat Join</h2>
+  <input id="studentId" placeholder="Student ID">
+  <input id="studentName" placeholder="Name">
+  <button onclick="joinChat()">Start Chat</button>
+</div>
+
+<div id="chatBox" class="chat-box" style="display:none;">
+  <div class="chat-area" id="chatArea"></div>
+  <input id="messageInput" placeholder="Type your message...">
+  <button onclick="sendMessage()">Send</button>
+</div>
+
+<script>
+  let studentId = '';
+  let studentName = '';
+  let pollingInterval;
+
+  function joinChat() {
+    studentId = document.getElementById("studentId").value.trim();
+    studentName = document.getElementById("studentName").value.trim();
+
+    if (studentId && studentName) {
+      google.script.run.withSuccessHandler(() => {
+        document.getElementById("joinForm").style.display = "none";
+        document.getElementById("chatBox").style.display = "block";
+        startPolling();
+      }).addToWaitingList(studentId, studentName);
+    } else {
+      alert("Please fill in all fields.");
+    }
+  }
+
+  function sendMessage() {
+    const msg = document.getElementById("messageInput").value.trim();
+    if (msg) {
+      google.script.run.sendStudentMessage(studentId, msg);
+      document.getElementById("messageInput").value = "";
+      fetchMessages();
+    }
+  }
+
+  function fetchMessages() {
+    google.script.run.withSuccessHandler(displayMessages).getMessages(studentId);
+  }
+
+  function displayMessages(msgArray) {
+    const area = document.getElementById("chatArea");
+    area.innerHTML = "";
+
+    msgArray.forEach(msg => {
+      const div = document.createElement("div");
+      div.className = "message " + (msg.sender === "Student" ? "you" : "staff");
+      div.textContent = msg.sender + ": " + msg.message;
+      area.appendChild(div);
+    });
+
+    area.scrollTop = area.scrollHeight;
+  }
+
+  function startPolling() {
+    fetchMessages();
+    pollingInterval = setInterval(fetchMessages, 1000);
+  }
+</script>
+</body>
+</html>
