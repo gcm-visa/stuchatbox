@@ -1,153 +1,156 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>User Chat</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <base target="_top">
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
+      font-family: Arial, sans-serif;
+      background-color: #ffffff;
+      color: #333;
       margin: 0;
       padding: 0;
-      background-color: #f6fdf6;
       display: flex;
-      flex-direction: column;
+      justify-content: center;
+      align-items: center;
       height: 100vh;
     }
 
-    header {
-      background-color: #28a745;
-      color: white;
-      padding: 16px;
-      text-align: center;
-      font-size: 1.25rem;
-      font-weight: bold;
-    }
-
-    #chat-messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 16px;
-      background-color: #ffffff;
-      border-top: 1px solid #d4ecd4;
-      border-bottom: 1px solid #d4ecd4;
-    }
-
-    #chat-messages div {
-      margin-bottom: 12px;
-      font-size: 0.95rem;
-      line-height: 1.4;
-    }
-
-    .user-message {
-      color: #333;
-    }
-
-    .staff-message {
-      color: #1a7f2c;
-      font-weight: bold;
-    }
-
-    #chat-form {
-      display: flex;
-      border-top: 1px solid #d4ecd4;
+    .box, .chat-box {
       background: #f9f9f9;
-      padding: 10px;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      width: 90%;
+      max-width: 450px;
     }
 
-    #chat-input {
-      flex: 1;
-      padding: 10px;
-      font-size: 1rem;
-      border: 1px solid #cce5cc;
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
       border-radius: 8px;
-      outline: none;
+      border: 1px solid #ccc;
+      font-size: 16px;
     }
 
-    #chat-form button {
-      margin-left: 10px;
-      padding: 10px 20px;
-      font-size: 1rem;
+    button {
       background-color: #28a745;
       color: white;
       border: none;
-      border-radius: 8px;
       cursor: pointer;
+      transition: background-color 0.3s ease;
     }
 
-    @media (max-width: 600px) {
-      #chat-form {
-        flex-direction: column;
+    button:hover {
+      background-color: #218838;
+    }
+
+    .chat-area {
+      height: 300px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      background: #e9ecef;
+    }
+
+    .message {
+      margin-bottom: 8px;
+    }
+
+    .message.you {
+      text-align: right;
+      color: #007bff;
+    }
+
+    .message.staff {
+      text-align: left;
+      color: #28a745;
+    }
+
+    @media (max-width: 480px) {
+      .box, .chat-box {
+        padding: 20px;
       }
-      #chat-form button {
-        margin: 10px 0 0 0;
-        width: 100%;
+
+      .chat-area {
+        height: 250px;
+      }
+
+      input, button {
+        font-size: 14px;
+        padding: 10px;
       }
     }
   </style>
 </head>
 <body>
 
-<header>Chat with Us</header>
+<div id="joinForm" class="box">
+  <h2>Student Chat Join</h2>
+  <input id="studentId" placeholder="Student ID">
+  <input id="studentName" placeholder="Name">
+  <button onclick="joinChat()">Start Chat</button>
+</div>
 
-<div id="chat-messages"></div>
-
-<form id="chat-form">
-  <input type="text" id="chat-input" placeholder="Type your message..." autocomplete="off" />
-  <button type="submit">Send</button>
-</form>
+<div id="chatBox" class="chat-box" style="display:none;">
+  <div class="chat-area" id="chatArea"></div>
+  <input id="messageInput" placeholder="Type your message...">
+  <button onclick="sendMessage()">Send</button>
+</div>
 
 <script>
-  const SUPABASE_URL = "https://oxthfocwsqttrzbdjzoj.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94dGhmb2N3c3F0dHJ6YmRqem9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3OTY5MjMsImV4cCI6MjA2MDM3MjkyM30.nytOvmjM5PNQO8BHeXOTIP_sMullS2PFB8tm5dihlNY";
-  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  let studentId = '';
+  let studentName = '';
+  let pollingInterval;
 
-  const chatMessages = document.getElementById("chat-messages");
-  const chatForm = document.getElementById("chat-form");
-  const chatInput = document.getElementById("chat-input");
+  function joinChat() {
+    studentId = document.getElementById("studentId").value.trim();
+    studentName = document.getElementById("studentName").value.trim();
 
-  let userName = prompt("Enter your name (optional):") || "Anonymous";
-
-  async function loadMessages() {
-    const { data } = await supabase
-      .from("chat_messages")
-      .select("*")
-      .order("created_at", { ascending: true });
-    chatMessages.innerHTML = "";
-    data.forEach(addMessageToUI);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    if (studentId && studentName) {
+      google.script.run.withSuccessHandler(() => {
+        document.getElementById("joinForm").style.display = "none";
+        document.getElementById("chatBox").style.display = "block";
+        startPolling();
+      }).addToWaitingList(studentId, studentName);
+    } else {
+      alert("Please fill in all fields.");
+    }
   }
 
-  function addMessageToUI(msg) {
-    const div = document.createElement("div");
-    div.className = msg.sender_type === 'staff' ? 'staff-message' : 'user-message';
-    div.textContent = `${msg.sender_type === 'staff' ? '👩‍💼 Staff' : msg.user_name}: ${msg.message}`;
-    chatMessages.appendChild(div);
+  function sendMessage() {
+    const msg = document.getElementById("messageInput").value.trim();
+    if (msg) {
+      google.script.run.sendStudentMessage(studentId, msg);
+      document.getElementById("messageInput").value = "";
+      fetchMessages();
+    }
   }
 
-  supabase
-    .channel("chatroom")
-    .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages" }, (payload) => {
-      addMessageToUI(payload.new);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    })
-    .subscribe();
+  function fetchMessages() {
+    google.script.run.withSuccessHandler(displayMessages).getMessages(studentId);
+  }
 
-  chatForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const message = chatInput.value.trim();
-    if (!message) return;
+  function displayMessages(msgArray) {
+    const area = document.getElementById("chatArea");
+    area.innerHTML = "";
 
-    await supabase.from("chat_messages").insert([
-      { user_name: userName, staff_name: null, sender_type: "user", message: message }
-    ]);
+    msgArray.forEach(msg => {
+      const div = document.createElement("div");
+      div.className = "message " + (msg.sender === "Student" ? "you" : "staff");
+      div.textContent = msg.sender + ": " + msg.message;
+      area.appendChild(div);
+    });
 
-    chatInput.value = "";
-  });
+    area.scrollTop = area.scrollHeight;
+  }
 
-  loadMessages();
+  function startPolling() {
+    fetchMessages();
+    pollingInterval = setInterval(fetchMessages, 1000);
+  }
 </script>
-
 </body>
 </html>
