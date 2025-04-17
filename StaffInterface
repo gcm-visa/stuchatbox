@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #2c3e50;
+      color: white;
+      padding: 40px;
+    }
+    .container {
+      max-width: 700px;
+      margin: auto;
+      background: #34495e;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    .hidden {
+      display: none;
+    }
+    h2, h3 {
+      color: #1abc9c;
+      margin-bottom: 20px;
+    }
+    ul {
+      list-style-type: none;
+      padding: 0;
+    }
+    li {
+      background: #1c2b36;
+      margin-bottom: 10px;
+      padding: 15px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+    .btn {
+      padding: 8px 12px;
+      background-color: #16a085;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background-color: #1abc9c;
+    }
+    .chat-area {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 10px;
+      height: 300px;
+      overflow-y: auto;
+      margin-top: 20px;
+      background: #1c2b36;
+    }
+    .message {
+      margin-bottom: 8px;
+    }
+    .message.staff {
+      text-align: right;
+      color: #16a085;
+    }
+    .message.student {
+      text-align: left;
+      color: #f39c12;
+    }
+    input, button {
+      width: 100%;
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 6px;
+      border: none;
+    }
+    #error {
+      color: red;
+      margin-top: 10px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Login Box -->
+    <div id="loginBox">
+      <h3>Staff Login</h3>
+      <input id="username" placeholder="Username">
+      <input id="password" type="password" placeholder="Password">
+      <button onclick="login()">Login</button>
+      <div id="error"></div>
+    </div>
+
+    <!-- Chat Interface -->
+    <div id="chatContainer" class="hidden">
+      <h2>Waiting Students</h2>
+      <ul id="waitingList">
+        <li>Loading...</li>
+      </ul>
+
+      <div id="chatBox" class="hidden">
+        <h3>Chat with: <span id="activeStudent"></span></h3>
+        <div class="chat-area" id="chatArea"></div>
+        <input id="staffMsg" placeholder="Type a message...">
+        <button class="btn" onclick="sendStaffMessage()">Send Message</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  let selectedStudent = null;
+  let pollingInterval;
+
+  function login() {
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value.trim();
+    const error = document.getElementById("error");
+
+    if (!username || !password) {
+      error.style.display = 'block';
+      error.textContent = "Please enter both username and password.";
+      return;
+    }
+
+    google.script.run.withSuccessHandler((res) => {
+      if (res.success) {
+        document.getElementById("loginBox").classList.add("hidden");
+        document.getElementById("chatContainer").classList.remove("hidden");
+        fetchWaitingList();
+        setInterval(fetchWaitingList, 1000);
+      } else {
+        error.style.display = 'block';
+        error.textContent = res.message;
+      }
+    }).authenticateStaff(username, password);
+  }
+
+  function fetchWaitingList() {
+    google.script.run.withSuccessHandler(displayWaitingList).getWaitingList();
+  }
+
+  function displayWaitingList(students) {
+    const list = document.getElementById("waitingList");
+    list.innerHTML = '';
+    students.forEach(student => {
+      const li = document.createElement('li');
+      li.textContent = student.name;
+      li.onclick = () => startChat(student.id);
+      list.appendChild(li);
+    });
+  }
+
+  function startChat(studentId) {
+    selectedStudent = studentId;
+    document.getElementById("activeStudent").textContent = selectedStudent;
+    document.getElementById("chatBox").classList.remove("hidden");
+    google.script.run.startChat(studentId);
+    fetchMessages();
+    if (pollingInterval) clearInterval(pollingInterval);
+    pollingInterval = setInterval(fetchMessages, 1000);
+  }
+
+  function sendStaffMessage() {
+    const msg = document.getElementById("staffMsg").value.trim();
+    if (msg && selectedStudent) {
+      google.script.run.sendStaffMessage(selectedStudent, msg);
+      document.getElementById("staffMsg").value = '';
+      fetchMessages();
+    }
+  }
+
+  function fetchMessages() {
+    google.script.run.withSuccessHandler(displayMessages).getMessages(selectedStudent);
+  }
+
+  function displayMessages(msgArray) {
+    const area = document.getElementById("chatArea");
+    area.innerHTML = "";
+    msgArray.forEach(msg => {
+      const div = document.createElement("div");
+      div.className = "message " + (msg.sender === "Student" ? "student" : "staff");
+      div.textContent = msg.sender + ": " + msg.message;
+      area.appendChild(div);
+    });
+    area.scrollTop = area.scrollHeight;
+  }
+</script>
+</body>
+</html>
